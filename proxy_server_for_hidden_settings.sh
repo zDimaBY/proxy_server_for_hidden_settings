@@ -107,29 +107,28 @@ check_ssh_keys() {
     fi
 }
 vpnStartAndConect() {
-    if output=$(wg-quick down wg0 2>&1); then
-        if echo "$output" | grep -q "is not a WireGuard interface"; then
-            echo "Помилка: wg0 не є інтерфейсом WireGuard."
-        else
-            echo "З'єднання WireGuard wg0 розірвано."
-        fi
+    output=$(wg-quick down wg0 2>&1)
+    if echo "$output" | grep -q "is not a WireGuard interface"; then
+        echo "Помилка: wg0 не є інтерфейсом WireGuard."
     else
-        echo "Сталася помилка при виконанні команди wg-quick down wg0."
+        echo "З'єднання WireGuard wg0 розірвано."
     fi
     while true; do
         ping -c 1 $REMOTE_ADDRESS >/dev/null 2>&1
         if [ $? -eq 0 ]; then
             break # Вихід з цикла.
         else
+            echo "Сервер $REMOTE_ADDRESS не пінгується, очікуємо 1хв"
             sleep 60
-            echo "Сервер $REMOTE_ADDRESS не пінгується"
         fi
     done
     check_ssh_keys $REMOTE_ADDRESS
 
-    REMOTE_COMMAND="wget https://raw.githubusercontent.com/zDimaBY/setting_up_control_panels/main/scripts/5_VPN.sh && \
+    REMOTE_COMMAND="wget -O 5_VPN.sh https://raw.githubusercontent.com/zDimaBY/setting_up_control_panels/main/scripts/5_VPN.sh && \
+        sed -i '/s|CLIENT_NAME=/d' ./5_VPN.sh && \
         source /etc/os-release && \
         operating_system=\"\$ID\" && \
+        if [[ -e /etc/wireguard/params ]]; then echo -e \"4\\ny\" | /root/VPN/wireguard-install.sh; fi && \
         source /root/5_VPN.sh && \
         mkdir -p /root/VPN/wireguard && \
         install_wireguard_scriptLocal"
@@ -159,15 +158,14 @@ for dependency in "${dependencies[@]}"; do
     check_dependency $dependency
 done
 
-vpnStartAndConect # Виконуємо налаштуваня на віддаленому сервері.
+vpnStartAndConect # Виконуємо налаштуваня на відаленому сервері
 
-while true; do
+while true; do # Авто відновлення тунеля.
     ping -c 1 10.0.0.1 >/dev/null 2>&1
     if [ $? -eq 0 ]; then
         sleep 10
     else
         echo "Сервер 10.0.0.1 не пінгується"
         vpnStartAndConect
-        break # Вихід з цикла.
     fi
 done
