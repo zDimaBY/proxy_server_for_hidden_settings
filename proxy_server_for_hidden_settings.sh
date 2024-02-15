@@ -4,6 +4,12 @@ REMOTE_ADDRESS=""
 REMOTE_USER=""
 REMOTE_PASSWORD=""
 
+if [ -z "$REMOTE_ADDRESS" ] || [ -z "$REMOTE_USER" ] || [ -z "$REMOTE_PASSWORD" ]; then
+    echo "Змінні REMOTE_ADDRESS, REMOTE_USER або REMOTE_PASSWORD не можуть бути пустими."
+    echo "Виконайте: vim /usr/local/bin/proxy_server_for_hidden_settings.sh"
+    exit 1
+fi
+
 function check_dependency() {
     local dependency_name=$1
     local package_name=$2

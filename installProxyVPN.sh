@@ -25,4 +25,6 @@ WantedBy=multi-user.target
 EOF
 
 systemctl enable proxy_server_for_hidden_settings
-systemctl start proxy_server_for_hidden_settings
+echo -e "\n\nВиконайте: vim /usr/local/bin/proxy_server_for_hidden_settings.sh"
+echo -e "systemctl restart proxy_server_for_hidden_settings\n\n"
+systemctl status proxy_server_for_hidden_settings
