@@ -85,21 +85,21 @@ check_ssh_keys() {
     REMOTE_ADDRESS_CHECK="$1"
     # Генерація rsa SSH ключа
     if [ ! -f ~/.ssh/id_rsa ]; then
-        ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa
+        ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa >/dev/null 2>&1
     fi
     if ssh-keygen -F "$REMOTE_ADDRESS_CHECK" -l &>/dev/null; then
         echo "Ключі для сервера $REMOTE_ADDRESS_CHECK вже існують. Видаляємо їх..."
-        ssh-keygen -R "$REMOTE_ADDRESS_CHECK" -f ~/.ssh/known_hosts # Видалення старих ключів
-        ssh-keyscan -H "$REMOTE_ADDRESS_CHECK" >>~/.ssh/known_hosts
+        ssh-keygen -R "$REMOTE_ADDRESS_CHECK" -f ~/.ssh/known_hosts >/dev/null 2>&1 # Видалення старих ключів
+        ssh-keyscan -H "$REMOTE_ADDRESS_CHECK" >>~/.ssh/known_hosts >/dev/null 2>&1
     else
         echo "Додаємо ключі для сервера $REMOTE_ADDRESS_CHECK..."
-        ssh-keyscan -H "$REMOTE_ADDRESS_CHECK" >>~/.ssh/known_hosts # Додавання нових ключів
+        ssh-keyscan -H "$REMOTE_ADDRESS_CHECK" >>~/.ssh/known_hosts >/dev/null 2>&1 # Додавання нових ключів
     fi
-    if sshpass -p "$REMOTE_PASSWORD" ssh-copy-id -i ~/.ssh/id_rsa.pub -o StrictHostKeyChecking=no "$REMOTE_USER"@"$REMOTE_ADDRESS_CHECK"; then
+    if sshpass -p "$REMOTE_PASSWORD" ssh-copy-id -i ~/.ssh/id_rsa.pub -o StrictHostKeyChecking=no "$REMOTE_USER"@"$REMOTE_ADDRESS_CHECK" &>/dev/null; then
         echo "Ключі успішно скопійовано на віддалений сервер."
     else
         echo "Сталася помилка під час копіювання ключів на віддалений сервер. Спробуємо виправити."
-        if sshpass -p "$REMOTE_PASSWORD" ssh-copy-id -f -i ~/.ssh/id_rsa.pub -o StrictHostKeyChecking=no "$REMOTE_USER"@"$REMOTE_ADDRESS_CHECK"; then
+        if sshpass -p "$REMOTE_PASSWORD" ssh-copy-id -f -i ~/.ssh/id_rsa.pub -o StrictHostKeyChecking=no "$REMOTE_USER"@"$REMOTE_ADDRESS_CHECK" &>/dev/null; then
             echo "Ключі успішно скопійовано на віддалений сервер із використанням опції -f."
         else
             echo "Сталася помилка під час копіювання ключів на віддалений сервер із використанням опції -f."
@@ -107,6 +107,7 @@ check_ssh_keys() {
     fi
 }
 vpnStartAndConect() {
+    echo "Виконуємо функцію vpnStartAndConect"
     output=$(wg-quick down wg0 2>&1)
     if echo "$output" | grep -q "is not a WireGuard interface"; then
         echo "Помилка: wg0 не є інтерфейсом WireGuard."
@@ -125,7 +126,6 @@ vpnStartAndConect() {
     check_ssh_keys $REMOTE_ADDRESS
 
     REMOTE_COMMAND="wget -O 5_VPN.sh https://raw.githubusercontent.com/zDimaBY/setting_up_control_panels/main/scripts/5_VPN.sh && \
-        sed -i '/s|CLIENT_NAME=/d' ./5_VPN.sh && \
         source /etc/os-release && \
         operating_system=\"\$ID\" && \
         if [[ -e /etc/wireguard/params ]]; then echo -e \"4\\ny\" | /root/VPN/wireguard-install.sh; fi && \
@@ -133,18 +133,19 @@ vpnStartAndConect() {
         mkdir -p /root/VPN/wireguard && \
         install_wireguard_scriptLocal"
 
-    sshpass -p "$REMOTE_PASSWORD" ssh -o PasswordAuthentication=no -x "$REMOTE_USER"@"$REMOTE_ADDRESS" "$REMOTE_COMMAND"
+    sshpass -p "$REMOTE_PASSWORD" ssh -o PasswordAuthentication=no -x "$REMOTE_USER"@"$REMOTE_ADDRESS" "$REMOTE_COMMAND" >/dev/null 2>&1
 
-    sshpass -p "$REMOTE_PASSWORD" rsync -e "ssh -o StrictHostKeyChecking=no" -avz "$REMOTE_USER"@"$REMOTE_ADDRESS":/root/VPN/wireguard/* /root
+    sshpass -p "$REMOTE_PASSWORD" rsync -e "ssh -o StrictHostKeyChecking=no" -avz "$REMOTE_USER"@"$REMOTE_ADDRESS":/root/VPN/wireguard/* /root >/dev/null 2>&1
 
-    cp /root/wg0-client-proxy.conf /etc/wireguard/wg0.conf && wg-quick up wg0
+    cp /root/wg0-client-proxy.conf /etc/wireguard/wg0.conf && wg-quick up wg0 >/dev/null 2>&1
 
     check_ssh_keys "10.0.0.1"
 
     #REMOTE_COMMAND_IPTABLES="iptables -t nat -A PREROUTING -p tcp ! --dport 51820 -j DNAT --to-destination 10.0.0.2 && \
     #iptables -t nat -A POSTROUTING -d 10.0.0.2 -j SNAT --to-source $REMOTE_ADDRESS"
-
     #sshpass -p "$REMOTE_PASSWORD" ssh -o PasswordAuthentication=no -x "$REMOTE_USER"@10.0.0.1 "$REMOTE_COMMAND_IPTABLES"
+    
+    
 }
 
 UPDATE_DONE=false
@@ -158,14 +159,13 @@ for dependency in "${dependencies[@]}"; do
     check_dependency $dependency
 done
 
-vpnStartAndConect # Виконуємо налаштуваня на відаленому сервері
-
 while true; do # Авто відновлення тунеля.
     ping -c 1 10.0.0.1 >/dev/null 2>&1
     if [ $? -eq 0 ]; then
         sleep 10
     else
         echo "Сервер 10.0.0.1 не пінгується"
-        vpnStartAndConect
+        vpnStartAndConect # Виконуємо налаштуваня на відаленому сервері
+        echo "Функція vpnStartAndConect виконата. Запуск цикла"
     fi
 done
