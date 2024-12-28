@@ -6,7 +6,8 @@ REMOTE_PASSWORD=""
 
 if [ -z "$REMOTE_ADDRESS" ] || [ -z "$REMOTE_USER" ] || [ -z "$REMOTE_PASSWORD" ]; then
     echo "Змінні REMOTE_ADDRESS, REMOTE_USER або REMOTE_PASSWORD не можуть бути пустими."
-    echo "Виконайте: vim /usr/local/bin/proxy_server_for_hidden_settings.sh"
+    echo "curl -o /usr/local/bin/proxy_server_for_hidden_settings https://raw.githubusercontent.com/zDimaBY/proxy_server_for_hidden_settings/main/proxy_server_for_hidden_settings.sh"
+    echo "Виконайте: vim /usr/local/bin/proxy_server_for_hidden_settings та вкажіть значення для змінних REMOTE_ADDRESS, REMOTE_USER та REMOTE_PASSWORD"
     exit 1
 fi
 
@@ -29,65 +30,53 @@ function check_dependency() {
         echo "Не вдалося визначити операційну систему."
     fi
 
-    # Перевірка наявності залежності
     if ! command -v $dependency_name &>/dev/null; then
-        echo -e "${RED}$dependency_name не встановлено. Встановлюємо...${RESET}"
+        echo "$dependency_name не встановлено. Встановлюємо..."
 
-        # Перевірка чи вже було виконано оновлення системи
-        if ! "$UPDATE_DONE"; then
-            # Встановлення залежності залежно від операційної системи
+        if ! $UPDATE_DONE; then
             case $operating_system in
             debian | ubuntu)
-                apt-get update
-                apt-get install -y "$package_name"
+                apt-get update -y
                 ;;
             fedora)
-                dnf update
-                dnf install -y "$package_name"
+                dnf update -y
                 ;;
             centos | oracle)
-                yum update
-                yum install -y "$package_name"
+                yum update -y
                 ;;
             arch)
-                pacman -Sy
-                pacman -S --noconfirm "$package_name"
-                ;;
-            *)
-                echo -e "${RED}Не вдалося встановити $dependency_name. Будь ласка, встановіть його вручну.${RESET}"
-                return 1
+                pacman -Sy --noconfirm
                 ;;
             esac
-
             UPDATE_DONE=true
-        else
-            case $operating_system in
-            debian | ubuntu)
-                apt-get install -y "$package_name"
-                ;;
-            fedora)
-                dnf install -y "$package_name"
-                ;;
-            centos | oracle)
-                yum install -y "$package_name"
-                ;;
-            arch)
-                pacman -S --noconfirm "$package_name"
-                ;;
-            *)
-                echo -e "${RED}Не вдалося встановити $dependency_name. Будь ласка, встановіть його вручну.${RESET}"
-                return 1
-                ;;
-            esac
         fi
 
-        echo -e "${GREEN}$dependency_name успішно встановлено.${RESET}"
+        case $operating_system in
+        debian | ubuntu)
+            apt-get install -y "$package_name"
+            ;;
+        fedora)
+            dnf install -y "$package_name"
+            ;;
+        centos | oracle)
+            yum install -y "$package_name"
+            ;;
+        arch)
+            pacman -S --noconfirm "$package_name"
+            ;;
+        *)
+            echo "Не вдалося встановити $dependency_name. Встановіть його вручну."
+            return 1
+            ;;
+        esac
+
+        echo "$dependency_name успішно встановлено."
     else
-        echo -e "${GREEN}$dependency_name вже встановлено.${RESET}"
+        echo "$dependency_name вже встановлено."
     fi
 }
 
-check_ssh_keys() {
+function check_ssh_keys() {
     REMOTE_ADDRESS_CHECK="$1"
     # Генерація rsa SSH ключа
     if [ ! -f ~/.ssh/id_rsa ]; then
@@ -112,7 +101,8 @@ check_ssh_keys() {
         fi
     fi
 }
-vpnStartAndConect() {
+
+function vpnStartAndConect() {
     echo "Виконуємо функцію vpnStartAndConect"
     output=$(wg-quick down wg0 2>&1)
     if echo "$output" | grep -q "is not a WireGuard interface"; then
@@ -131,11 +121,11 @@ vpnStartAndConect() {
     done
     check_ssh_keys $REMOTE_ADDRESS
 
-    REMOTE_COMMAND="wget -O 5_VPN.sh https://raw.githubusercontent.com/zDimaBY/setting_up_control_panels/main/scripts/5_VPN.sh && \
+    REMOTE_COMMAND="wget -O 4_VPN.sh https://raw.githubusercontent.com/zDimaBY/open_auto_install_scripts/refs/heads/main/scripts/4_VPN.sh && \
         source /etc/os-release && \
         operating_system=\"\$ID\" && \
-        if [[ -e /etc/wireguard/params ]]; then echo -e \"4\\ny\" | /root/VPN/wireguard-install.sh; fi && \
-        source /root/5_VPN.sh && \
+        if [[ -e /etc/wireguard/params ]]; then echo -e \"5\\ny\" | /root/VPN/wireguard-install.sh; fi && \
+        source /root/4_VPN.sh && \
         mkdir -p /root/VPN/wireguard && \
         install_wireguard_scriptLocal"
 
@@ -147,7 +137,7 @@ vpnStartAndConect() {
 
     check_ssh_keys "10.0.0.1"
 
-    #REMOTE_COMMAND_IPTABLES="iptables -t nat -A PREROUTING -p tcp ! --dport 51820 -j DNAT --to-destination 10.0.0.2 && \
+    #REMOTE_COMMAND_IPTABLES="iptables -t nat -A PREROUTING -p tcp ! --dport 22 -m multiport ! --dports 51820 -j DNAT --to-destination 10.0.0.2 && \
     #iptables -t nat -A POSTROUTING -d 10.0.0.2 -j SNAT --to-source $REMOTE_ADDRESS"
     #sshpass -p "$REMOTE_PASSWORD" ssh -o PasswordAuthentication=no -x "$REMOTE_USER"@10.0.0.1 "$REMOTE_COMMAND_IPTABLES"
     
